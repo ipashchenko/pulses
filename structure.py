@@ -84,10 +84,14 @@ class Pipeline(object):
             de-dispersed & optionally preprocessed data.
         """
         self.iterator = iterator
+        self.de_disperser = de_disperser
+        self.pre_processers = pre_processers
+        self.searchers = searchers
+        assert len(pre_processers) == len(searchers)
         
     def run(self):
         for dsp in self.iterator:         
-            for pre_processer, searcher in zip(pre_processers, searchers):
+            for pre_processer, searcher in zip(self.pre_processers, self.searchers):
                 dddsp = de_disperser(dsp, cache_dir=cache_dir)
                 try:
                     dddsp = pre_processor(dddsp, cache_dir=cache_dir)
