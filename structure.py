@@ -1,11 +1,11 @@
 class DeDisperser(object):
-    def __init__(self, func, do_caching, cache_dir):
+    def __init__(self, func, *args, **kwargs):
         pass
         
-    def __call__(self, dsp, *args, **kwargs):
+    def __call__(self, dsp, cache_dir):
         pass
         
-    def reset_cache(dsp, cache_dir):
+    def clear_cache(dsp, cache_dir):
         pass
         
 class MetaData(dict):
@@ -30,7 +30,7 @@ def create_from_fits(fn, t0, dt, nchan, d_t, metadata):
     
 class DSPIterator(object):
     """http://stackoverflow.com/a/11690539"""
-    def __init__(self, fn):
+    def __init__(self, fn, t0, dt, nchan, d_t, metadata):
         pass
     def __iter__(self):
         yield dsp
@@ -44,18 +44,18 @@ class DedispersedDynSpectra(object):
         self.dd_params
         
 class PreProcesser(object):
-    def __init__(self, func, do_caching, cache_dir, *args, **kwargs):
+    def __init__(self, func, *args, **kwargs):
         pass
         
-    def __call__(self, dd_dsp):
+    def __call__(self, dd_dsp, cache_dir):
         pass
         
-    def reset_cache(dd_dsp, cache_dir):
+    def clear_cache(dd_dsp, cache_dir):
         pass
 
 # FIXME: Should work with any class instances - `dsp` or `dddsp`        
 class Searcher(object):
-    def __init__(func, *args, **kwargs):
+    def __init__(func, db_file, *args, **kwargs):
         pass
         
     def __call__(self, dd_dsp):
@@ -70,11 +70,11 @@ class PulseClassifier(object):
         pass
 
 class Pipeline(object):
-    def __init__(self, iterator, de_dispersers, pre_processers, searchers, db_file):
+    def __init__(self, iterator, de_disperser, pre_processers, searchers, db_file, cache_dir=None):
         """
         :param iterator:
             Iterator that returns instances of ``DynSpectra`` class.
-        :param de_dispersers:
+        :param de_disperser:
             Instance of ``DeDisperion`` class used to de-disperse data.
         :param pre_processers:
             Iterable of ``PreProcesser`` class instances used to pre-process
@@ -87,32 +87,36 @@ class Pipeline(object):
         
     def run(self):
         for dsp in self.iterator:         
-            dd = Dedispersion(de_disp_params['func'])
-            prep = PreProcessing(pre_process_params['func'])
-            dd_dsp = dd(dsp, dm_values, threads)
-            search_1 = Search(search_params[0]['func'])
-            candidates_1 = search_1(dd_dsp, *args, **kwargs)
-
-            dd_dsp = prep(dd_dsp, *pre_args, **pre_kwargs)
-
-            search_2 = Search(search_ell)
-            search_3 = Search(search_clf)
-
-            candidates_2 = search_2(dd_dsp, *args, **kwargs)
-            candidates_3 = search_3(dd_dsp, *args, **kwargs)
-            t0 += dt
+            for pre_processer, searcher in zip(pre_processers, searchers):
+                dddsp = de_disperser(dsp, cache_dir=cache_dir)
+                try:
+                    dddsp = pre_processor(dddsp, cache_dir=cache_dir)
+                except TypeError:
+                    pass
+                candidates = searcher(dddsp)
 
 class CFX(object):
     pass
  
 class RAPipeline(object):
-    def __init__(self, exp_code, cfx_file, dsp_params, raw_data_dir, db_file):
+    def __init__(self, exp_code, cfx_file, raw_data_dir, db_file, cache_dir):
         self.exp_code = exp_code
-        self.cfx_file = cfx_file
-        self.dsp_params = dsp_params
         self.raw_data_dir = raw_data_dir
         self.db_file = db_file
+        self.cache_dir = cache_dir
         self.cfx = CFX(cfx_file)
+        self._dedisperser = None
+        self._preprocessers = None
+        self._searchers = None
+        
+    def add_dedispersion(dedisperser):
+        self._dedisperser = dedisperser
+        
+    def add_preprocessers(preprocessers):
+        self._preprocessers = preprocessers
+        
+    def add_searchers(searchers):
+        self._searchers = searchers
         
    @property
     def exp_params(self):
@@ -125,6 +129,28 @@ class RAPipeline(object):
     def run(self):
         exp_candidates = defaultdict(list)
         for m5_file, m5_params in self.exp_params.items():
+            m5_file = os.path.join(self.raw_data_dir, m5_file)
             iterator = DSPIterator(m5_file, m5_params)
-            pipeline = Pipeline(iterator, de_dispersers, pre_processers, searchers, db_file)
+            pipeline = Pipeline(iterator, self._dedisperser, self._preprocessers, self._searchers,
+                                self.db_file, self.cache_dir)
             pipeline.run()
+            
+if __name__ = '__main__':
+    dedisperser = DeDisperser(non_coherent_dedispersion, [dm_values], {'threads': 4})
+    preprocessers = [None, PreProcesser(create_ellipses, [],
+                                        {'disk_size': 3,
+                                         'threshold_big_perc': 90.,
+                                         'threshold_perc': 97.5,
+                                         'statistic': 'mean'})]
+    searchers = [Searcher(search_shear, {'mph': 3.5, 'mpd': 50,
+                                         'shear': 0.4, 'd_dm': d_dm}),
+                 Searcher(search_ell, {'x_stddev': 10., 'y_to_x_stddev': 0.3,
+                                        'theta_lims': [130., 180.],
+                                        'x_cos_theta': 3., 'd_dm': d_dm,
+                                         'amplitude': None, 'save_fig': True})]
+    ra_pipeline = RAPipeline(exp_code, cfx_file, raw_data_dir, db_file, cache_dir)
+    ra_pipeline.add_dedisperser(dedisperser)
+    ra_pipeline.add_preprocessers(preprocessers)
+    ra_pipeline.add_searchers(searchers)
+    ra_pipeline.run()
+                                            
