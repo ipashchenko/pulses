@@ -1,30 +1,24 @@
-class DeDisperser(object):
-    def __init__(self, func, *args, **kwargs):
-        pass
-        
-    def __call__(self, dsp, cache_dir):
-        pass
-        
-    def clear_cache(dsp, cache_dir):
-        pass
-        
+import os
+from collections import defaultdict
+
+
 class MetaData(dict):
     def __init__(self):
         pass
-                
+
 class DynSpectra(object):
     def __init__(self):
         pass
-        
+
 def create_from_txt(fn, t0, dt, nchan, metadata):
     pass
-    
+
 def create_from_hdf5(fn, t0, dt, nchan, d_t, metadata):
     pass
-    
+
 def create_from_mk5(fn, fmt, t0, dt, nchan, d_t, metadata):
     pass
-    
+
 def create_from_fits(fn, t0, dt, nchan, d_t, metadata):
     pass
 
@@ -36,10 +30,10 @@ class DSPIterator(object):
         pass
     def __iter__(self):
         pass
-    
+
 class DSPIterator(object):
     """
-       Generator that returns instances of ``DynSpectra`` class.
+       Generator that returns instances of ``DSP`` class.
        :param m5_file:
            Raw data file in M5 format.
        :param m5_params:
@@ -56,7 +50,7 @@ class DSPIterator(object):
         self.m5_fmt = m5_fmt
         self.chunk_size = chunk_size
         self.freq_band_pol = freq_band_pol
-        
+
     def __iter__(self):
         m5 = M5(m5_file, m5_fmt)
         offset = 0
@@ -82,48 +76,51 @@ class DSPIterator(object):
             dsp.add_values(dsarr.T)
             offset += chunk_size
 
-yield dsp
         yield dsp
-        
+
 class DedispersedDynSpectra(object):
     def __init__(self):
+        """
         self.array
         self.dm
         self.t
         self.dsp
         self.dd_params
-        
+        """
+        pass
+
 class PreProcesser(object):
     def __init__(self, func, *args, **kwargs):
         pass
-        
+
     def __call__(self, dd_dsp, cache_dir):
         pass
-        
+
     def clear_cache(dd_dsp, cache_dir):
         pass
 
-# FIXME: Should work with any class instances - `dsp` or `dddsp`        
+# FIXME: Should work with any class instances - `dsp` or `dddsp`
 class Searcher(object):
     def __init__(func, db_file, *args, **kwargs):
         pass
-        
+
     def __call__(self, dd_dsp):
         pass
-        
+
 class PulseClassifier(object):
     def __init__(clf, dd, prep, *dd_args, *pre_args,
                  **pre_kwargs):
         pass
-        
+
     def train(dsp, n_pulses):
         pass
 
 class Pipeline(object):
-    def __init__(self, iterator, de_disperser, pre_processers, searchers, db_file, cache_dir=None):
+    def __init__(self, iterator, de_disperser, pre_processers, searchers,
+                 db_file, cache_dir=None):
         """
         :param iterator:
-            Iterator that returns instances of ``DynSpectra`` class.
+            Iterator that returns instances of ``DSP`` class.
         :param de_disperser:
             Instance of ``DeDisperion`` class used to de-disperse data.
         :param pre_processers:
@@ -137,21 +134,23 @@ class Pipeline(object):
         self.de_disperser = de_disperser
         self.pre_processers = pre_processers
         self.searchers = searchers
+        self.cache_dir = cache_dir
         assert len(pre_processers) == len(searchers)
-        
+
     def run(self):
-        for dsp in self.iterator:         
-            for pre_processer, searcher in zip(self.pre_processers, self.searchers):
-                dddsp = de_disperser(dsp, cache_dir=cache_dir)
+        for dsp in self.iterator:
+            for pre_processer, searcher in zip(self.pre_processers,
+                                               self.searchers):
+                dddsp = self.de_disperser(dsp, cache_dir=self.cache_dir)
                 try:
-                    dddsp = pre_processor(dddsp, cache_dir=cache_dir)
+                    dddsp = pre_processer(dddsp, cache_dir=self.cache_dir)
                 except TypeError:
                     pass
                 candidates = searcher(dddsp)
 
 class CFX(object):
     pass
- 
+
 class RAPipeline(object):
     def __init__(self, exp_code, cfx_file, raw_data_dir, db_file, cache_dir):
         self.exp_code = exp_code
@@ -162,16 +161,16 @@ class RAPipeline(object):
         self._dedisperser = None
         self._preprocessers = None
         self._searchers = None
-        
+
     def add_dedispersion(dedisperser):
         self._dedisperser = dedisperser
-        
+
     def add_preprocessers(preprocessers):
         self._preprocessers = preprocessers
-        
+
     def add_searchers(searchers):
         self._searchers = searchers
-        
+
    @property
     def exp_params(self):
         """
@@ -188,8 +187,8 @@ class RAPipeline(object):
             pipeline = Pipeline(iterator, self._dedisperser, self._preprocessers, self._searchers,
                                 self.db_file, self.cache_dir)
             pipeline.run()
-            
-if __name__ = '__main__':
+
+if __name__ == '__main__':
     dedisperser = DeDisperser(non_coherent_dedispersion, [dm_values], {'threads': 4})
     preprocessers = [None, PreProcesser(create_ellipses, [],
                                         {'disk_size': 3,
@@ -207,4 +206,4 @@ if __name__ = '__main__':
     ra_pipeline.add_preprocessers(preprocessers)
     ra_pipeline.add_searchers(searchers)
     ra_pipeline.run()
-                                            
+
