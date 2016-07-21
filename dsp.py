@@ -216,150 +216,25 @@ class DSP(object):
                                      self.n_nu)).reshape(np.shape(self.values))
         self.values += noise
 
-    def create_dm_grid(self, dm_min, dm_max, dm_delta=None):
-        """
-        Method that create DM-grid for current frame.
-        :param dm_min:
-            Minimal value [cm^3 /pc].
-        :param dm_max:
-            Maximum value [cm^3 /pc].
-        :param dm_delta: (optional)
-            Delta of DM for grid [cm^3/pc]. If ``None`` then choose one that
-            corresponds to time shift equals to time resolution for frequency
-            bandwidth. Actually used value is 5 times larger.
-            (default: ``None``)
-        :return:
-            Numpy array of DM values [cm^3 / pc]
-        """
-        raise NotImplementedError
-
-    def grid_dedisperse(self, dm_grid, threads=1):
-        """
-        Method that de-disperse ``DSP`` instance with range values of
-        dispersion measures and average them in frequency to obtain image in
-        (t, DM)-plane.
-        :param dm_grid:
-            Array-like of value of DM on which to de-disperse [cm^3/pc].
-        :param threads: (optional)
-            Number of threads used for parallelization with ``multiprocessing``
-            module. If > 1 then it isn't used. (default: 1)
-        """
-        pool = None
-        if threads > 1:
-            pool = multiprocessing.Pool(threads, maxtasksperchild=1000)
-
-        if pool:
-            m = pool.map
-        else:
-            m = map
-
-        # Accumulator of de-dispersed frequency averaged frames
-        frames = list(m(self._de_disperse_by_value_freq_average,
-                        dm_grid.tolist()))
-        frames = np.array(frames)
-
-        if pool:
-            # Close pool
-            pool.close()
-            pool.join()
-
-        return frames
-
-    def save_to_hdf5(self, fname, name='dsp'):
-        """
-        Save data to HDF5 format.
-        :param fname:
-            File to save data.
-        :param name: (optional)
-            Name of dataset to use. (default: ``dsp``)
-        :note:
-            HDF5 hasn't time formats. Using ``str(datetime)`` to create strings
-            with microseconds.
-        """
-        import h5py
-        f = h5py.File(fname, "w")
-        dset = f.create_dataset(name, data=self.values, chunks=True,
-                                compression='gzip')
-        meta_data = self.meta_data.copy()
-        meta_data.update({'n_nu': self.n_nu, 'n_t': self.n_t, 'nu_0': self.nu_0,
-                          'd_nu': self.d_nu, 'd_t': self.d_t.sec,
-                          't_0': str(self.t_0)})
-        for key, value in meta_data.items():
-            dset.attrs[key] = value
-        f.flush()
-        f.close()
-
-
-def create_from_hdf5(fname, name='dsp', n_nu_discard=0):
-    """
-    Function that creates instance of ``DSP`` class from HDF5-file.
-    :param fname:
-        Name of HDF5-file with `dsp` data set that is 2D numpy.ndarray with rows
-        representing frequency channels and columns - 1d-time series of data for
-        each frequency channel and meta-data.
-    :param name: (optional)
-        Name of dataset to use. (default: ``dsp``)
-    :param n_nu_discard: (optional)
-        NUmber of spectral channels to discard symmetrically from both low and
-         high frequency.
-    :return:
-        Instance of ``DSP`` class.
-    """
-    data, meta_data = read_hdf5(fname, name)
-    n_nu = meta_data.pop('n_nu')
-    n_t = meta_data.pop('n_t')
-    nu_0 = meta_data.pop('nu_0')
-    d_nu = meta_data.pop('d_nu')
-    d_t = meta_data.pop('d_t')
-    t_0 = Time(meta_data.pop('t_0'))
-    dsp = DSP(n_nu - n_nu_discard, n_t, nu_0 - n_nu_discard * d_nu / 2.,
-              d_nu, d_t, meta_data, t_0=t_0)
-    dsp.add_values(data)
-    return dsp
-
-
-def create_from_txt(fname, nu_0, d_nu, d_t, meta_data, t_0=None,
-                    n_nu_discard=0):
-    """
-    Function that creates instance of ``DSP`` class from text file.
-    :param fname:
-        Name of txt-file with rows representing frequency channels and columns -
-        1d-time series of data for each frequency channel.
-    :param nu_0:
-        Frequency of highest frequency channel [MHz].
-    :param d_nu:
-        Width of spectral channel [MHz].
-    :param d_t:
-        Time step [s].
-    :param meta_data:
-        Dictionary with metadata describing current dynamical spectra. It must
-        include ``exp_name`` [string], ``antenna`` [string], ``freq`` [string],
-        ``band`` [string], ``pol`` [string] keys.
-    :param t_0: (optional)
-        Time of first measurement. Instance of ``astropy.time.Time`` class. If
-        ``None`` then use time of initialization. (default: ``None``)
-    :param n_nu_discard: (optional)
-        NUmber of spectral channels to discard symmetrically from both low and
-         high frequency.
-    :return:
-        Instance of ``DSP`` class.
-    """
-    assert not int(n_nu_discard) % 2
-
-    try:
-        values = np.load(fname).T
-    except IOError:
-        values = np.loadtxt(fname, unpack=True)
-    n_nu, n_t = np.shape(values)
-    dsp = DSP(n_nu - n_nu_discard, n_t, nu_0 - n_nu_discard * d_nu / 2.,
-              d_nu, d_t, meta_data=meta_data, t_0=t_0)
-    if n_nu_discard:
-        dsp.values += values[n_nu_discard / 2: -n_nu_discard / 2, :]
-    else:
-        dsp.values += values
-
-    return dsp
-
 
 class DDDSP(object):
+    def __init__(self, dm_values, dsp=None):
+        """
+        :param d_t:
+            Time step [s].
+        :param t_0: (optional)
+            Time of first measurement. Instance of ``astropy.time.Time`` class. If
+            ``None`` then use time of initialization. (default: ``None``)
+        """
 
+        self.dsp = dsp
+        self.n_t = dsp.n_t
+        self.n_dm = len(dm_values)
+        self.t_0 = self.dsp.t_0
+        self.d_t = self.dsp.d_t
+        self.array = np.zeros((self.n_dm, self.n_t), float)
+        self.dm_values = dm_values
+        
+        # TODO: if one choose what channels to plot - use ``extent`` kwarg.
+    def plot(self, savefig=None):
+        pass
