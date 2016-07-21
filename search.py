@@ -1,18 +1,29 @@
+# -*- coding: utf-8 -*-
+import numpy as np
+from detect_peaks import detect_peaks
+from utils import NoIntensityRegionException, fit_elliplse, find_clusters_ell_amplitudes, \
+    get_props
 from skimage.transform import warp, AffineTransform
 from scipy.signal import medfilt
 from astropy.stats import mad_std
+from astropy.time import TimeDelta
+import matplotlib
+matplotlib.use('Agg')
 
 
 # FIXME: Should work with any class instances - `dsp` or `dddsp`
 class Searcher(object):
-    def __init__(func, db_file, *args, **kwargs):
-        pass
+    def __init__(self, func, db_file, *args, **kwargs):
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
 
     def __call__(self, dddsp, plot_candidates=True):
-        found_dmt = self.function(dd_dsp.array, *self.args, **self.kwargs)
+        found_dmt = self.func(dddsp.array, *self.args, **self.kwargs)
         candidates = list()
         for ix_dm, ix_t in found_dmt:
-            candidate = Candidate(dddsp.t_0 + ix_t * TimeDelta(dddsp.d_t, format='sec'),
+            candidate = Candidate(dddsp.t_0 +
+                                  ix_t * TimeDelta(dddsp.d_t, format='sec'),
                                   float(dddsp.dm_values[ix_dm))
             candidates.append(candidate)
         if plot_candidates:
@@ -21,7 +32,7 @@ class Searcher(object):
         return candidates
 
 
-def search_candidates_shear(image, t_0, d_t, d_dm, mph=3.5, mpd=50,
+def search_shear(image, t_0, d_t, d_dm, mph=3.5, mpd=50,
                             original_dsp=None, shear=0.4):
     tform = AffineTransform(shear=shear)
     warped_image = warp(image, tform)
@@ -37,7 +48,7 @@ def search_candidates_shear(image, t_0, d_t, d_dm, mph=3.5, mpd=50,
 
 
 # TODO: All search functions must returns instances of ``Candidate`` class
-def search_candidates_clf(image, pclf, t_0, d_t, d_dm, save_fig=False,
+def search_clf(image, pclf, t_0, d_t, d_dm, save_fig=False,
                           original_dsp=None):
     """
     Search FRB in de-dispersed and pre-processed dynamical spectra using
@@ -72,16 +83,11 @@ def search_candidates_clf(image, pclf, t_0, d_t, d_dm, save_fig=False,
     return ixs
 
 
-def search_candidates_ell(image, x_stddev, x_cos_theta,
+def search_ell(image, x_stddev, x_cos_theta,
                           y_to_x_stddev, theta_lims, t_0, d_t, d_dm,
                           save_fig=False, amplitude=None,
                           original_dsp=None):
-    a = image.copy()
-    s = generate_binary_structure(2, 2)
-    # Label image
-    labeled_array, num_features = label(a, structure=s)
-    # Find objects
-    props = regionprops(labeled_array, intensity_image=image)
+    props = get_props(image)
     ixs = list()
     if amplitude is None:
         amplitudes = list()
@@ -127,5 +133,5 @@ def search_candidates_ell(image, x_stddev, x_cos_theta,
                               save_file="search_ell_{}.png".format(i))
             max_pos = (gg.x_mean + prop.bbox[0], gg.y_mean + prop.bbox[1])
             ixs.append(max_pos)
-            
+
     return ixs

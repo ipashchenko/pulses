@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import multiprocessing
 from utils import vint, vround
@@ -43,7 +44,7 @@ def _de_disperse_by_value_freq_average(array, dm, nu, nu_max, d_t):
     return values / n_nu
 
 
-def noncoherent_dedisperse(array, dm_grid, nu_max, d_nu, d_t, threads=1):
+def noncoherent_dedispersion(array, dm_grid, nu_max, d_nu, d_t, threads=1):
     """
     Method that de-disperse dynamical spectra with range values of dispersion
     measures and average them in frequency to obtain image in (t, DM)-plane.
@@ -91,6 +92,7 @@ def noncoherent_dedisperse(array, dm_grid, nu_max, d_nu, d_t, threads=1):
 
 
 class DeDisperser(object):
+
     def __init__(self, func, dm_values, *args, **kwargs):
         self.func = func
         self.dm_values = dm_values

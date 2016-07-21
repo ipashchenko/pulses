@@ -1,9 +1,11 @@
-    
-from scipy.ndimage.measurements import maximum_position, label, find_objects
+# -*- coding: utf-8 -*-
+import os
+import numpy as np
+from scipy.ndimage.measurements import label
 from scipy.ndimage.morphology import generate_binary_structure
-from scipy.signal import medfilt
 from skimage.measure import regionprops
 from skimage.morphology import opening
+from utils import circular_mean, circular_median, gaussian_filter
 
 
 class PreProcesser(object):
@@ -21,7 +23,7 @@ class PreProcesser(object):
 
     def clear_cache(dddsp, cache_dir):
         pass
-    
+
 
 # FIXME: ``skimage.filters.median`` use float images with ranges ``[-1, 1]``. I
 # can scale original, use ``median`` and then scale back - it is much faster
@@ -91,4 +93,4 @@ def create_ellipses(tdm_image, disk_size=3, threshold_big_perc=97.5,
     image[image < threshold] = 0
     image = opening(image, opening_selem)
 
-return image
+    return image

@@ -1,8 +1,20 @@
 import numpy as np
+from scipy.stats import rayleigh
+from skimage.measure import regionprops
+from scipy.ndimage.morphology import generate_binary_structure
+from scipy.ndimage.measurements import label
+from sklearn.cluster import DBSCAN
+from astropy.modeling import models, fitting
+import matplotlib
+matplotlib.use('Agg')
 
 
 vint = np.vectorize(int)
 vround = np.vectorize(round)
+
+
+class NoIntensityRegionException(Exception):
+    pass
 
 
 def circular_mean(data, radius):
@@ -54,31 +66,36 @@ def infer_gaussian(data):
     return amplitude, x_0, y_0, width
 
 
-def get_props(image, threshold):
+def get_props(image, threshold=None):
     """
-    Rerurn measured properties list of imaged labeled at specified threshold.
+    Return measured properties list of imaged labeled at specified threshold.
+
     :param image:
         Numpy 2D array with image.
-    :param threshold:
-        Threshold to label image. [0.-100.]
+    :param threshold: (optional)
+        Threshold to label image. [0.-100.]. If ``None`` then don't threshold.
+        (default: ``None``)
+
     :return:
-        List of RegionProperties -
-        (``skimage.measure._regionprops._RegionProperties`` instances)
+        List of ``skimage.measure._regionprops._RegionProperties`` instances.
     """
     threshold = np.percentile(image.ravel(), threshold)
     a = image.copy()
-    # Keep only tail of image values distribution with signal
-    a[a < threshold] = 0
+    if threshold is not None:
+        # Keep only tail of image values distribution with signal
+        a[a < threshold] = 0
     s = generate_binary_structure(2, 2)
     # Label image
     labeled_array, num_features = label(a, structure=s)
-return regionprops(labeled_array, intensity_image=image)
+    return regionprops(labeled_array, intensity_image=image)
 
 
 def fit_elliplse(prop, plot=False, save_file=None, colorbar_label=None,
                  close=False, show=True):
     """
-    Function that fits 2D ellipses to `t-DM` image.
+    Fit 2D ellipses to part of image image represented by
+    ``skimage.measure._regionprops._RegionProperties`` instance.
+
     :param prop:
         ``skimage.measure._regionprops._RegionProperties`` instance
     :return:
@@ -86,12 +103,15 @@ def fit_elliplse(prop, plot=False, save_file=None, colorbar_label=None,
         fitted to `t-DM` image in region of ``prop``.
     """
     data = prop.intensity_image.copy()
+
     # Remove high-intensity background
     try:
         data -= np.unique(sorted(data.ravel()))[1]
     except IndexError:
         raise NoIntensityRegionException("No intensity in region!")
     data[data < 0] = 0
+
+    # Make some initial guess based on fitting by method of moments.
     amp, x_0, y_0, width = infer_gaussian(data)
     x_lims = [0, data.shape[0]]
     y_lims = [0, data.shape[1]]
@@ -101,9 +121,6 @@ def fit_elliplse(prop, plot=False, save_file=None, colorbar_label=None,
     fit_g = fitting.LevMarLSQFitter()
     x, y = np.indices(data.shape)
     gg = fit_g(g, x, y, data)
-    # print gg.x_stddev, gg.y_stddev
-    # print abs(gg.x_stddev), abs(gg.y_stddev / gg.x_stddev),\
-    #     np.rad2deg(gg.theta) % 180
 
     if plot:
         fig, ax = matplotlib.pyplot.subplots(1, 1)
@@ -131,16 +148,64 @@ def fit_elliplse(prop, plot=False, save_file=None, colorbar_label=None,
             matplotlib.pyplot.close()
 
     return gg
-    
-    
+
+
+# FIXME: When # amplitudes is small enough, ``eps`` becomes too large...
+def find_clusters_ell_amplitudes(amplitudes, min_samples=10, leaf_size=5,
+                                 eps=None):
+    """
+
+    :param amplitudes:
+    :param eps:
+        `eps` parameter of `DBSCAN`.
+    :param min_samples:
+        `min_samples` parameter of `DBSCAN`.
+    :param leaf_size:
+        `leaf_size` parameter of `DBSCAN`.
+    :return:
+        Threshold for amplitude. Chosen in a way that fitted elliptical
+        gaussians with amplitude higher then the threshold should be outliers
+        (ie. represent signals).
+    """
+
+    data = np.asarray(amplitudes).copy()
+    ldata = np.log(data)
+    data_ = data.reshape((data.size, 1))
+    ldata_ = ldata.reshape((ldata.size, 1))
+
+    data_range = np.max(data) - np.min(data)
+    if eps is None:
+        eps = data_range / np.sqrt(len(amplitudes))
+        print "eps {}".format(eps)
+    db = DBSCAN(eps=eps, min_samples=min_samples,
+                leaf_size=leaf_size).fit(data_)
+    core_samples_mask = np.zeros_like(db.labels_, dtype=bool)
+    core_samples_mask[db.core_sample_indices_] = True
+    labels = db.labels_
+    # Number of clusters in labels, ignoring noise if present.
+    n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+    unique, unique_counts = np.unique(labels, return_counts=True)
+    largest_cluster_data = data[labels == unique[np.argmax(unique_counts)]]
+    outliers = data[labels == -1]
+    params = rayleigh.fit(largest_cluster_data)
+    distr = rayleigh(loc=params[0], scale=params[1])
+    threshold = distr.ppf(0.999)
+
+    # Need data > threshold to ensure that low power outliers haven't been
+    # included
+    indx = np.logical_and(labels == -1, data > threshold)
+    # return threshold
+    return min(data[indx]) - eps
+
+
     def plot_2d(array, bbox=None, colorbar_label=None, close=False, save_file=None,
                 show=True, xlabel=None, ylabel=None, ):
         """
         Plot [part of the] 2D array.
-        
+
         :param array:
             2D array to plot.
-        
+
         :param bbox: (optional)
             Bounding box of region to plot (x1, y1, x2, y2) - ``prop.bbox``. If ``None``
             then plot all.
