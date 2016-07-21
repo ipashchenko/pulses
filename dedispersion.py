@@ -91,8 +91,9 @@ def noncoherent_dedisperse(array, dm_grid, nu_max, d_nu, d_t, threads=1):
 
 
 class DeDisperser(object):
-    def __init__(self, func, *args, **kwargs):
+    def __init__(self, func, dm_values, *args, **kwargs):
         self.func = func
+        self.dm_values = dm_values
         self.args = args
         self.kwargs = kwargs
 
@@ -101,9 +102,13 @@ class DeDisperser(object):
         :param dsp:
             Instance of ``DSP`` class.
         :param cache_dir:
+            Directory to store cached results.
         :return:
+            Instance of ``DDDSP`` calss
         """
-        pass
+        dddsp = DDDSP(dsp, dm_values)
+        dddsp.array = self.func(dsp.array, self.dm_grid, *self.args, **self.kwargs)
+        return dddsp
 
     def clear_cache(dsp, cache_dir):
         pass
