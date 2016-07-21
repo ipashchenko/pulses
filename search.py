@@ -1,76 +1,29 @@
-from scipy.ndimage.measurements import maximum_position, label, find_objects
-from scipy.ndimage.morphology import generate_binary_structure
+from skimage.transform import warp, AffineTransform
 from scipy.signal import medfilt
-from skimage.measure import regionprops
-from skimage.morphology import opening
+from astropy.stats import mad_std
 
 
-# FIXME: ``skimage.filters.median`` use float images with ranges ``[-1, 1]``. I
-# can scale original, use ``median`` and then scale back - it is much faster
-# then mine
-def create_ellipses(tdm_image, disk_size=3, threshold_big_perc=97.5,
-                    threshold_perc=None, statistic='mean',
-                    opening_selem=np.ones((3, 3)), max_prop_size=25000):
-    """
-    Function that pre-process de-dispersed plane `t-DM` by filtering out BIG
-    regions of high intensity and subsequent filtering, noise cleaning by
-    opening and thresholding.
-    :param tdm_image:
-        2D numpy.ndarray  of `t-DM` plane.
-    :param disk_size: (optional)
-        Disk size to use when calculating filtered values. (default: ``3``)
-    :param threshold_big_perc: (optional)
-        Threshold [0. - 100.] to threshold image after filtering to find BIG
-        regions that would be filtered out. (default: ``97.5``)
-    :param threshold_perc: (optional)
-        Threshold [0. - 100.] to threshold image after filtering BIG big regions
-        out. (default: ``97.5``)
-    :param statistic: (optional)
-        Statistic to use when filtering (``mean``, ``median`` or ``gauss``).
-        (default: ``mean``)
-    :param opening_selem: (optional)
-        The neighborhood expressed as a 2-D array of 1’s and 0’s for opening
-        step. (default: ``np.ones((4, 4))``)
-    :param max_prop_size: (optional)
-        Maximum size of region to be filtered out from ``tdm_array``. (default:
-        ``25000``)
-    :return:
-        2D numpy.ndarray of thresholded image of `t - DM` plane.
-    """
-    statistic_dict = {'mean': circular_mean, 'median': circular_median,
-                      'gauss': gaussian_filter}
+def search_candidates_shear(image, t_0, d_t, d_dm, mph=3.5, mpd=50,
+                            original_dsp=None, shear=0.4):
+    tform = AffineTransform(shear=shear)
+    warped_image = warp(image, tform)
+    warped = np.sum(warped_image, axis=0)
+    smoothed = medfilt(warped, 101)
+    warped = medfilt(warped, 5)
+    warped = (warped - smoothed) / mad_std(warped)
+    indxs = detect_peaks(warped, mph=mph, mpd=mpd)
+    dm_indxs = list()
+    for indx in indxs:
+        dm_indxs.append(np.argmax(warped_image[:, indx]))
+    candidates = list()
+    for i, (t_indx, dm_indx) in enumerate(zip(indxs, dm_indxs)):
+        candidate = Candidate(t_0 + t_indx * TimeDelta(d_t, format='sec'),
+                              dm_indx * float(d_dm))
+        candidates.append(candidate)
+        if original_dsp is not None:
+            plot_rect_original_dsp(t_indx, 50,
+                                   original_dsp=original_dsp, show=False,
+                                   close=True,
+                                   save_file="search_shear_dsp_{}.png".format(i))
 
-    if threshold_big_perc is not None:
-        image = tdm_image.copy()
-        image = statistic_dict[statistic](image, disk_size)
-        threshold = np.percentile(image.ravel(), threshold_big_perc)
-        image[image < threshold] = 0
-        # FIXME: In ubuntu 16.04 this raises ``ValueError: Images of type float
-        # must be between -1 and 1.`` Upgrading to newer ``skimage`` solved the
-        # problem
-        image = opening(image, opening_selem)
-
-        # FInd BIG regions & exclude them in original ``tdm_image``. Then redo
-        a = image.copy()
-        s = generate_binary_structure(2, 2)
-        # Label image
-        labeled_array, num_features = label(a, structure=s)
-        # Find objects
-        props = regionprops(labeled_array, intensity_image=image)
-        big_sized_props = list()
-        for prop in props:
-            if prop.area > max_prop_size:
-                big_sized_props.append(prop)
-        for prop in big_sized_props:
-            bb = prop.bbox
-            print "Filtering out region {} with area {}".format(bb, prop.area)
-            tdm_image[bb[0]:bb[2], bb[1]:bb[3]] = np.mean(tdm_image)
-
-    image = statistic_dict[statistic](tdm_image, disk_size)
-    if threshold_perc is None:
-        threshold_perc = threshold_big_perc
-    threshold = np.percentile(image.ravel(), threshold_perc)
-    image[image < threshold] = 0
-    image = opening(image, opening_selem)
-
-    return image
+return candidates
