@@ -106,6 +106,10 @@ class DeDisperser(object):
         :return:
             Instance of ``DDDSP`` calss
         """
+        de_disp_cache_fname = os.path.join(cache_dir,
+                                           dsp._cache_fname_prefix +
+                                           "_dedisp.hdf5")
+
         dddsp = DDDSP(dsp, dm_values)
         dddsp.array = self.func(dsp.array, self.dm_grid, *self.args, **self.kwargs)
         return dddsp
