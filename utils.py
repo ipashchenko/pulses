@@ -131,4 +131,40 @@ def fit_elliplse(prop, plot=False, save_file=None, colorbar_label=None,
             matplotlib.pyplot.close()
 
     return gg
-
+    
+    
+    def plot_2d(array, bbox=None, colorbar_label=None, close=False, save_file=None,
+                show=True, xlabel=None, ylabel=None, ):
+        """
+        Plot [part of the] 2D array.
+        
+        :param array:
+            2D array to plot.
+        
+        :param bbox: (optional)
+            Bounding box of region to plot (x1, y1, x2, y2) - ``prop.bbox``. If ``None``
+            then plot all.
+        """
+        fig, ax = matplotlib.pyplot.subplots(1, 1)
+        ax.hold(True)
+        if bbox is not None:
+            data = array[bbox[0]: bbox[2], bbox[1]: bbox[3]]
+        else:
+            data = array
+        im = ax.matshow(data, aspect='auto', cmap=matplotlib.pyplot.cm.jet)
+        if xlabel:
+            ax.set_xlabel(xlabel)
+        if ylabel:
+            ax.set_ylabel(ylabel)
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="10%", pad=0.00)
+        cb = fig.colorbar(im, cax=cax)
+        if colorbar_label is not None:
+            cb.set_label(colorbar_label)
+        if save_file is not None:
+            fig.savefig(save_file, bbox_inches='tight', dpi=200)
+        if show:
+            fig.show()
+        if close:
+            matplotlib.pyplot.close()
