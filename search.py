@@ -9,7 +9,7 @@ class Searcher(object):
         pass
 
     def __call__(self, dddsp, plot_candidates=True):
-        found_dmt = self.function(dd_dsp, *self.args, **self.kwargs)
+        found_dmt = self.function(dd_dsp.array, *self.args, **self.kwargs)
         candidates = list()
         for ix_dm, ix_t in found_dmt:
             candidate = Candidate(dddsp.t_0 + ix_t * TimeDelta(dddsp.d_t, format='sec'),
@@ -29,22 +29,11 @@ def search_candidates_shear(image, t_0, d_t, d_dm, mph=3.5, mpd=50,
     smoothed = medfilt(warped, 101)
     warped = medfilt(warped, 5)
     warped = (warped - smoothed) / mad_std(warped)
-    indxs = detect_peaks(warped, mph=mph, mpd=mpd)
-    dm_indxs = list()
-    for indx in indxs:
-        dm_indxs.append(np.argmax(warped_image[:, indx]))
-    candidates = list()
-    for i, (t_indx, dm_indx) in enumerate(zip(indxs, dm_indxs)):
-        candidate = Candidate(t_0 + t_indx * TimeDelta(d_t, format='sec'),
-                              dm_indx * float(d_dm))
-        candidates.append(candidate)
-        if original_dsp is not None:
-            plot_rect_original_dsp(t_indx, 50,
-                                   original_dsp=original_dsp, show=False,
-                                   close=True,
-                                   save_file="search_shear_dsp_{}.png".format(i))
-
-return candidates
+    ixs_t = detect_peaks(warped, mph=mph, mpd=mpd)
+    ixs_dm = list()
+    for ix_t in ixs_t:
+        ixs_dm.append(np.argmax(warped_image[:, ix_t]))
+    return zip(ixs_dm, ixs_t)
 
 
 # TODO: All search functions must returns instances of ``Candidate`` class
@@ -68,7 +57,7 @@ def search_candidates_clf(image, pclf, t_0, d_t, d_dm, save_fig=False,
     for i, (prop, response) in enumerate(out_responses_dict.items()):
         if response:
             positive_props.append([i, prop])
-    candidates = list()
+    ixs = list()
     # Fit them with ellipse and create ``Candidate`` instances
     for i, prop in positive_props:
         try:
@@ -77,19 +66,10 @@ def search_candidates_clf(image, pclf, t_0, d_t, d_dm, save_fig=False,
         except NoIntensityRegionException:
             continue
 
-
-        if original_dsp is not None:
-            plot_prop_original_dsp(prop, original_dsp=original_dsp,
-                                    show=False, close=True,
-                                    save_file="search_clf_dsp_{}.png".format(i))
-
-
         max_pos = (gg.x_mean + prop.bbox[0], gg.y_mean + prop.bbox[1])
-        candidate = Candidate(t_0 + max_pos[1] * TimeDelta(d_t, format='sec'),
-                              max_pos[0] * float(d_dm))
-        candidates.append(candidate)
+        ixs.append(max_pos)
 
-return candidates
+    return ixs
 
 
 def search_candidates_ell(image, x_stddev, x_cos_theta,
@@ -102,7 +82,7 @@ def search_candidates_ell(image, x_stddev, x_cos_theta,
     labeled_array, num_features = label(a, structure=s)
     # Find objects
     props = regionprops(labeled_array, intensity_image=image)
-    candidates = list()
+    ixs = list()
     if amplitude is None:
         amplitudes = list()
         for i, prop in enumerate(props):
@@ -145,14 +125,7 @@ def search_candidates_ell(image, x_stddev, x_cos_theta,
                 (theta_lims[0] < np.rad2deg(gg.theta) % 180 < theta_lims[1])):
             gg = fit_elliplse(prop, plot=save_fig, show=False, close=True,
                               save_file="search_ell_{}.png".format(i))
-            if original_dsp is not None:
-                plot_prop_original_dsp(prop, original_dsp=original_dsp,
-                                       show=False, close=True,
-                                       save_file="search_ell_dsp_{}.png".format(i))
             max_pos = (gg.x_mean + prop.bbox[0], gg.y_mean + prop.bbox[1])
-            candidate = Candidate(t_0 + max_pos[1] * TimeDelta(d_t,
-                                                               format='sec'),
-                                  max_pos[0] * float(d_dm))
-            candidates.append(candidate)
-
-return candidates
+            ixs.append(max_pos)
+            
+    return ixs
