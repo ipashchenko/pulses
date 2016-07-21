@@ -3,6 +3,24 @@ from scipy.signal import medfilt
 from astropy.stats import mad_std
 
 
+# FIXME: Should work with any class instances - `dsp` or `dddsp`
+class Searcher(object):
+    def __init__(func, db_file, *args, **kwargs):
+        pass
+
+    def __call__(self, dddsp, plot_candidates=True):
+        found_dmt = self.function(dd_dsp, *self.args, **self.kwargs)
+        candidates = list()
+        for ix_dm, ix_t in found_dmt:
+            candidate = Candidate(dddsp.t_0 + ix_t * TimeDelta(dddsp.d_t, format='sec'),
+                                  float(dddsp.dm_values[ix_dm))
+            candidates.append(candidate)
+        if plot_candidates:
+            for candidate in candidates:
+                candidate.plot()
+        return candidates
+
+
 def search_candidates_shear(image, t_0, d_t, d_dm, mph=3.5, mpd=50,
                             original_dsp=None, shear=0.4):
     tform = AffineTransform(shear=shear)
