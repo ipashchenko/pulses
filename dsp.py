@@ -100,6 +100,15 @@ class DSP(object):
         self.t_end = self.t[-1]
         self.d_nu = d_nu
         self.meta_data = MetaData(meta_data)
+        
+    @property
+    def _cache_fname_prefix(self):
+        date_0, time_0 = str(self.dsp.t_0.utc.datetime).split(' ')
+        date_1, time_1 = str(self.dsp.t_end.utc.datetime).split(' ')
+        return "{}_{}_{}_{}_{}_{}_{}".format(self.meta_data['exp_code'],
+                                             self.meta_data['antenna'],
+                                             self.meta_data['freq'], date_0,
+                                             time_0, date_1, time_1)
 
     def __repr__(self):
         outprint = "# channels: {}\n".format(self.n_nu)
