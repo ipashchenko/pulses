@@ -9,6 +9,7 @@ class PreProcesser(object):
                                     dddsp.dsp._cache_fname_prefix +
                                     "_preprocess.hdf5")
         dddsp.array = self.func(dddsp.array, *self.args, **self.kwargs)
+        return dddsp
 
     def clear_cache(dddsp, cache_dir):
         pass
