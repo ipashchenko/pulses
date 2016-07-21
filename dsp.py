@@ -3,6 +3,7 @@ import multiprocessing
 import ctypes
 import numpy as np
 from astropy.time import Time, TimeDelta
+from utils import plot_2d
 
 try:
     import matplotlib
@@ -164,27 +165,10 @@ class DSP(object):
             Bounding box of region to plot (x1, y1, x2, y2) - ``prop.bbox``. If ``None``
             then plot all.
         """
-        fig, ax = matplotlib.pyplot.subplots(1, 1)
-        ax.hold(True)
-        if bbox is not None:
-            data = self.values[bbox[0]: bbox[2], bbox[1]: bbox[3]]
-        else:
-            data = self.valeus
-        im = ax.matshow(data, aspect='auto', cmap=matplotlib.pyplot.cm.jet)
-        ax.set_xlabel('Time step')
-        ax.set_ylabel('Frequency channel')
-        from mpl_toolkits.axes_grid1 import make_axes_locatable
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="10%", pad=0.00)
-        cb = fig.colorbar(im, cax=cax)
-        if colorbar_label is not None:
-            cb.set_label(colorbar_label)
-        if save_file is not None:
-            fig.savefig(save_file, bbox_inches='tight', dpi=200)
-        if show:
-            fig.show()
-        if close:
-            matplotlib.pyplot.close()
+        plot_2d(self.values, bbox=bbox, colorbar_label=colorbar_label, close=close,
+                save_file=save_file, show=show, xlabel='Time',
+                ylabel='Dynamical spectra')
+
 
     # TODO: if one choose what channels to plot - use ``extent`` kwarg.
     def plot(self, plot_indexes=True, savefig=None):
@@ -275,6 +259,15 @@ class DDDSP(object):
         self.array = np.zeros((self.n_dm, self.n_t), float)
         self.dm_values = dm_values
         
-        # TODO: if one choose what channels to plot - use ``extent`` kwarg.
-    def plot(self, savefig=None):
-        pass
+    def plot(self, bbox=None, colorbar_label=None, close=False, save_file=None,
+             show=True):
+        """
+        Plot de-dispersed dynamical spectra.
+        
+        :param bbox: (optional)
+            Bounding box of region to plot (x1, y1, x2, y2) - ``prop.bbox``. If ``None``
+            then plot all.
+        """
+        plot_2d(self.array, bbox=bbox, colorbar_label=colorbar_label, close=close,
+                save_file=save_file, show=show, xlabel='Time',
+                ylabel='Freq. averaged de-dispersed spectra')
