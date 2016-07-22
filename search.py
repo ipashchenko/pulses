@@ -3,6 +3,7 @@ import numpy as np
 from detect_peaks import detect_peaks
 from utils import NoIntensityRegionException, fit_elliplse, find_clusters_ell_amplitudes, \
     get_props
+from candidate import Candidate
 from skimage.transform import warp, AffineTransform
 from scipy.signal import medfilt
 from astropy.stats import mad_std
@@ -13,7 +14,7 @@ matplotlib.use('Agg')
 
 # FIXME: Should work with any class instances - `dsp` or `dddsp`
 class Searcher(object):
-    def __init__(self, func, db_file, *args, **kwargs):
+    def __init__(self, func, *args, **kwargs):
         self.func = func
         self.args = args
         self.kwargs = kwargs
@@ -24,7 +25,7 @@ class Searcher(object):
         for ix_dm, ix_t in found_dmt:
             candidate = Candidate(dddsp.t_0 +
                                   ix_t * TimeDelta(dddsp.d_t, format='sec'),
-                                  float(dddsp.dm_values[ix_dm))
+                                  float(dddsp.dm_values[ix_dm]))
             candidates.append(candidate)
         if plot_candidates:
             for candidate in candidates:
@@ -32,8 +33,7 @@ class Searcher(object):
         return candidates
 
 
-def search_shear(image, t_0, d_t, d_dm, mph=3.5, mpd=50,
-                            original_dsp=None, shear=0.4):
+def search_shear(image, mph=3.5, mpd=50, shear=0.4):
     tform = AffineTransform(shear=shear)
     warped_image = warp(image, tform)
     warped = np.sum(warped_image, axis=0)
@@ -48,8 +48,7 @@ def search_shear(image, t_0, d_t, d_dm, mph=3.5, mpd=50,
 
 
 # TODO: All search functions must returns instances of ``Candidate`` class
-def search_clf(image, pclf, t_0, d_t, d_dm, save_fig=False,
-                          original_dsp=None):
+def search_clf(image, pclf, save_fig=True):
     """
     Search FRB in de-dispersed and pre-processed dynamical spectra using
     instance of trained ``PulseClassifier`` instance.
@@ -61,7 +60,7 @@ def search_clf(image, pclf, t_0, d_t, d_dm, save_fig=False,
     :return:
         List of ``Candidate`` instances.
     """
-    out_features_dict, out_responses_dict = pclf.classify_data(image)
+    out_features_dict, out_responses_dict = pclf.classify(image)
 
     # Select only positively classified regions
     positive_props = list()
@@ -83,10 +82,8 @@ def search_clf(image, pclf, t_0, d_t, d_dm, save_fig=False,
     return ixs
 
 
-def search_ell(image, x_stddev, x_cos_theta,
-                          y_to_x_stddev, theta_lims, t_0, d_t, d_dm,
-                          save_fig=False, amplitude=None,
-                          original_dsp=None):
+def search_ell(image, x_stddev, x_cos_theta, y_to_x_stddev, theta_lims,
+               save_fig=False, amplitude=None):
     props = get_props(image)
     ixs = list()
     if amplitude is None:

@@ -1,24 +1,7 @@
-import os
 import h5py
 import numpy as np
 from dsp import DSP
-from astropy.time import Time, TimeDelta
-
-
-def create_from_txt(fn, t0, dt, nchan, metadata):
-    pass
-
-
-def create_from_hdf5(fn, t0, dt, nchan, d_t, metadata):
-    pass
-
-
-def create_from_mk5(fn, fmt, t0, dt, nchan, d_t, metadata):
-    pass
-
-
-def create_from_fits(fn, t0, dt, nchan, d_t, metadata):
-    pass
+from astropy.time import Time
 
 
 def read_hdf5(fname, name):
@@ -151,57 +134,11 @@ class DSPIterator(object):
     """
     http://stackoverflow.com/a/11690539
     """
-    def __init__(self):
-        pass
+    def __init__(self, n):
+        self.n = n
 
     def __iter__(self):
-        pass
+        for i in xrange(self.n):
+            yield i
 
-
-class DSPIterator(object):
-    """
-       Generator that returns instances of ``DSP`` class.
-       :param m5_file:
-           Raw data file in M5 format.
-       :param m5_params:
-           Dictionary with meta data.
-       :param chunk_size:
-           Size (in s) of chunks to process raw data.
-    """
-    def __init__(self, m5_file, m5_fmt, freq_band_pol, chunk_size):
-        """
-        :param freq_band_pol:
-            Iterable of bands specification, eg. ['4828.00-L-U', '4828.00-R-U', '4828.00-L-L', '4828.00-R-L']
-        """
-        self.m5_file = m5_file
-        self.m5_fmt = m5_fmt
-        self.chunk_size = chunk_size
-        self.freq_band_pol = freq_band_pol
-
-    def __iter__(self):
-        m5 = M5(m5_file, m5_fmt)
-        offset = 0
-
-        while offset * 32e6 < m5.size:
-            ds = m5.create_dspec(n_nu, d_t, offset, dur, outfile, dspec_path=None)
-
-            # NOTE: all 4 channels are stacked forming dsarr:
-            dsarr = dspec_cat(os.path.basename(ds['Dspec_file']),
-                              self.freq_band_pol)
-            metadata = ds
-            t_0 = m5.start_time + TimeDelta(offset, format='sec')
-            print "t_0 : ", t_0.datetime
-
-            metadata.pop('Dspec_file')
-            metadata.update({'antenna': m5_params['antenna'],
-                             'freq': self.cfx.freq,
-                             'band': "".join(m5_params['band']),
-                             'pol': "".join(m5_params['pol']),
-                             'exp_code': m5_params['exp_code']})
-            # FIXME: ``2`` means combining U&L bands.
-            dsp = DSP(2 * n_nu, n_t, nu_0, d_nu, d_t, meta_data, t_0)
-            dsp.add_values(dsarr.T)
-            offset += chunk_size
-
-        yield dsp
 

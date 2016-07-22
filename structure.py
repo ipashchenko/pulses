@@ -4,16 +4,10 @@ from collections import defaultdict
 from searched_data import SearchedData
 from db import connect_to_db
 from io import DSPIterator
+from cfx import CFX
 
 
-class PulseClassifier(object):
-    def __init__(clf, dd, prep, *dd_args, *pre_args,
-                 **pre_kwargs):
-        pass
-
-    def train(dsp, n_pulses):
-        pass
-
+# FIXME: Split file to RA-independent part & RA-part
 class Pipeline(object):
     def __init__(self, dsp_iterator, de_disperser, pre_processers, searchers,
                  db_file, cache_dir=None):
@@ -50,8 +44,6 @@ class Pipeline(object):
 
                 candidates = searcher(dddsp)
 
-
-
                 algo = 'de_disp_{}_{}_{} pre_process_{}_{}_{}' \
                        ' search_{}_{}'.format(de_disp_func.__name__, de_disp_args,
                                               de_disp_kwargs,
@@ -66,10 +58,6 @@ class Pipeline(object):
                     session = connect_to_db(self.db_file)
                     session.add(searched_data)
                     session.commit()
-
-
-class CFX(object):
-    pass
 
 
 class RAPipeline(object):
@@ -100,34 +88,63 @@ class RAPipeline(object):
         """
         return self.cfx.parse_cfx(self.exp_code)
 
-    def run(self):
+    def run(self, freq_band_pol, chunk_size, n_nu, d_t, nu_0, d_nu, meta_data):
         exp_candidates = defaultdict(list)
         for m5_file, m5_params in self.exp_params.items():
             m5_file = os.path.join(self.raw_data_dir, m5_file)
-            iterator = DSPIterator(m5_file, m5_params)
-            pipeline = Pipeline(iterator, self._dedisperser, self._preprocessers, self._searchers,
+            iterator = DSPIterator(m5_file, m5_params, chunk_size=chunk_size,
+                                   n_nu=n_nu, d_t=d_t, nu_0=nu_0, d_nu=d_nu,
+                                   meta_data=meta_data)
+            pipeline = Pipeline(iterator, self._dedisperser,
+                                self._preprocessers, self._searchers,
                                 self.db_file, self.cache_dir)
             pipeline.run()
 
+
 if __name__ == '__main__':
+    db_file = None
+    exp_code = None
+    cache_dir = None
+    raw_data_dir = None
+    cfx_file = None
+
     from dedispersion import DeDisperser, noncoherent_dedispersion
     from preprocess import PreProcesser, create_ellipses
     from search import Searcher, search_clf, search_ell, search_shear
     dm_values = range(0, 1000, 30)
     dedisperser = DeDisperser(noncoherent_dedispersion, [dm_values],
                               {'threads': 4})
-    preprocessers = [None, PreProcesser(create_ellipses, [],
-                                        {'disk_size': 3,
-                                         'threshold_big_perc': 90.,
-                                         'threshold_perc': 97.5,
-                                         'statistic': 'mean'})]
+    preprocesser = PreProcesser(create_ellipses, [], {'disk_size': 3,
+                                                      'threshold_big_perc': 90.,
+                                                      'threshold_perc': 97.5,
+                                                      'statistic': 'mean'})
+    preprocessers = [None, preprocesser, preprocesser]
+
+    # Training instance of ``PulseClassifier``
+    from classifier import PulseClassifier
+    from sklearn.ensemble import GradientBoostingClassifier
+    param_grid = {'learning_rate': [0.3, 0.1, 0.05, 0.01],
+                  'max_depth': [2, 3, 4, 5],
+                  'min_samples_leaf': [2, 3, 6, 10],
+                  'max_features': [1.0, 0.5, 0.2, 0.1]}
+    clf_kwargs = {'n_estimators': 3000}
+    pclf = PulseClassifier(GradientBoostingClassifier, preprocesser, param_grid,
+                           clf_kwargs)
+    from Mk5 import DSPIterator
+    dsp_train = DSPIterator(m5_file, m5_fmt, freq_band_pol, chunk_size, n_nu,
+                            d_t, nu_0, d_nu, meta_data).get_dsp()
+    features_dict, responses_dict = pclf.create_samples(dsp_train, pls_params)
+    pclf.train(features_dict, responses_dict)
+
+
     searchers = [Searcher(search_shear, {'mph': 3.5, 'mpd': 50,
-                                         'shear': 0.4, 'd_dm': d_dm}),
+                                         'shear': 0.4}),
                  Searcher(search_ell, {'x_stddev': 10., 'y_to_x_stddev': 0.3,
                                         'theta_lims': [130., 180.],
-                                        'x_cos_theta': 3., 'd_dm': d_dm,
-                                         'amplitude': None, 'save_fig': True})]
-    ra_pipeline = RAPipeline(exp_code, cfx_file, raw_data_dir, db_file, cache_dir)
+                                        'x_cos_theta': 3., 'save_fig': True}),
+                 Searcher(search_clf, {'save_fig': True})]
+    ra_pipeline = RAPipeline(exp_code, cfx_file, raw_data_dir, db_file,
+                             cache_dir)
     ra_pipeline.add_dedisperser(dedisperser)
     ra_pipeline.add_preprocessers(preprocessers)
     ra_pipeline.add_searchers(searchers)

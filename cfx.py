@@ -103,4 +103,4 @@ class CFX(object):
                         'pol': [if_.split()[1].strip(',') for if_ in ifs]}
                 for f in files:
                     cfxdata.update({f: val1})
-return cfxdata
+        return cfxdata

@@ -68,7 +68,7 @@ class DSP(object):
         Number of time steps.
     :param nu_0:
         Frequency of highest frequency channel [MHz].
-    :param dnu:
+    :param d_nu:
         Width of spectral channel [MHz].
     :param d_t:
         Time step [s].
@@ -101,7 +101,7 @@ class DSP(object):
         self.t_end = self.t[-1]
         self.d_nu = d_nu
         self.meta_data = MetaData(meta_data)
-        
+
     @property
     def _cache_fname_prefix(self):
         date_0, time_0 = str(self.dsp.t_0.utc.datetime).split(' ')
@@ -160,7 +160,7 @@ class DSP(object):
              show=True):
         """
         Plot dynamical spectra.
-        
+
         :param bbox: (optional)
             Bounding box of region to plot (x1, y1, x2, y2) - ``prop.bbox``. If ``None``
             then plot all.
@@ -258,12 +258,12 @@ class DDDSP(object):
         self.d_t = self.dsp.d_t
         self.array = np.zeros((self.n_dm, self.n_t), float)
         self.dm_values = dm_values
-        
+
     def plot(self, bbox=None, colorbar_label=None, close=False, save_file=None,
              show=True):
         """
         Plot de-dispersed dynamical spectra.
-        
+
         :param bbox: (optional)
             Bounding box of region to plot (x1, y1, x2, y2) - ``prop.bbox``. If ``None``
             then plot all.

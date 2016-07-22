@@ -1,3 +1,5 @@
+import os
+import fnmatch
 import numpy as np
 from scipy.stats import rayleigh
 from skimage.measure import regionprops
@@ -93,7 +95,7 @@ def get_props(image, threshold=None):
 def fit_elliplse(prop, plot=False, save_file=None, colorbar_label=None,
                  close=False, show=True):
     """
-    Fit 2D ellipses to part of image image represented by
+    Fit 2D ellipses to part of image represented by
     ``skimage.measure._regionprops._RegionProperties`` instance.
 
     :param prop:
@@ -198,38 +200,90 @@ def find_clusters_ell_amplitudes(amplitudes, min_samples=10, leaf_size=5,
     return min(data[indx]) - eps
 
 
-    def plot_2d(array, bbox=None, colorbar_label=None, close=False, save_file=None,
-                show=True, xlabel=None, ylabel=None, ):
-        """
-        Plot [part of the] 2D array.
+def get_ellipse_features_for_classification(image):
+    """
+    Get features of ``skimage.measure._regionprops._RegionProperties`` objects.
 
-        :param array:
-            2D array to plot.
+    :param image:
+        2D image [eg. de-dispersed and pre-processed dynamical spectra].
+    :return:
+        List of features of ``skimage.measure._regionprops._RegionProperties``
+        objects.
+    """
+    # Find objects
+    props = get_props(image)
+    features = dict()
+    for prop in props:
+        try:
+            gg = fit_elliplse(prop, plot=False, close=True)
+        except NoIntensityRegionException:
+            continue
+        # TODO: Subclass Exception for this case
+        # TODO: Add std of image area in pre_processed image. Noisy props will
+        # have higher std?
+        features[prop] = [prop.area, gg.amplitude.value, abs(gg.x_stddev.value),
+                          abs(gg.y_stddev.value), abs(gg.theta.value),
+                          abs(gg.x_stddev.value/gg.y_stddev.value),
+                          prop.extent, abs(gg.amplitude/prop.mean_intensity),
+                          prop.solidity, prop.major_axis_length,
+                          prop.minor_axis_length, prop.perimeter,
+                          prop.max_intensity, prop.mean_intensity,
+                          prop.weighted_moments_hu[0],
+                          prop.weighted_moments_hu[1],
+                          prop.weighted_moments_hu[2], prop.orientation,
+                          prop.inertia_tensor_eigvals[0],
+                          prop.inertia_tensor_eigvals[1], prop.filled_area,
+                          prop.euler_number, prop.eccentricity,
+                          prop.convex_area]
 
-        :param bbox: (optional)
-            Bounding box of region to plot (x1, y1, x2, y2) - ``prop.bbox``. If ``None``
-            then plot all.
-        """
-        fig, ax = matplotlib.pyplot.subplots(1, 1)
-        ax.hold(True)
-        if bbox is not None:
-            data = array[bbox[0]: bbox[2], bbox[1]: bbox[3]]
-        else:
-            data = array
-        im = ax.matshow(data, aspect='auto', cmap=matplotlib.pyplot.cm.jet)
-        if xlabel:
-            ax.set_xlabel(xlabel)
-        if ylabel:
-            ax.set_ylabel(ylabel)
-        from mpl_toolkits.axes_grid1 import make_axes_locatable
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="10%", pad=0.00)
-        cb = fig.colorbar(im, cax=cax)
-        if colorbar_label is not None:
-            cb.set_label(colorbar_label)
-        if save_file is not None:
-            fig.savefig(save_file, bbox_inches='tight', dpi=200)
-        if show:
-            fig.show()
-        if close:
-            matplotlib.pyplot.close()
+    return features
+
+
+def plot_2d(array, bbox=None, colorbar_label=None, close=False, save_file=None,
+            show=True, xlabel=None, ylabel=None, ):
+    """
+    Plot [part of the] 2D array.
+
+    :param array:
+        2D array to plot.
+    :param bbox: (optional)
+        Bounding box of region to plot (x1, y1, x2, y2) - ``prop.bbox``. If
+        ``None`` then plot all.
+    """
+    fig, ax = matplotlib.pyplot.subplots(1, 1)
+    ax.hold(True)
+    if bbox is not None:
+        data = array[bbox[0]: bbox[2], bbox[1]: bbox[3]]
+    else:
+        data = array
+    im = ax.matshow(data, aspect='auto', cmap=matplotlib.pyplot.cm.jet)
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="10%", pad=0.00)
+    cb = fig.colorbar(im, cax=cax)
+    if colorbar_label is not None:
+        cb.set_label(colorbar_label)
+    if save_file is not None:
+        fig.savefig(save_file, bbox_inches='tight', dpi=200)
+    if show:
+        fig.show()
+    if close:
+        matplotlib.pyplot.close()
+
+
+def find_file(fname, path='/'):
+    """
+    Find a file ``fname`` in ``path``. Wildcards are supported
+    (ak)
+    """
+    matches = []
+    for root, dirnames, filenames in os.walk(path):
+        for filename in fnmatch.filter(filenames, fname):
+            matches.append(os.path.join(root, filename))
+    if not matches:
+        return None
+    return matches
