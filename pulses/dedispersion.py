@@ -2,6 +2,7 @@ import os
 import numpy as np
 import multiprocessing
 from utils import vint, vround
+from dsp import DDDSP
 
 
 # MHz ** 2 * cm ** 3 * s / pc
@@ -9,7 +10,7 @@ k = 1. / (2.410331 * 10 ** (-4))
 
 
 # It is a one step for next function
-def _de_disperse_by_value_freq_average(array, dm, nu, nu_max, d_t):
+def _de_disperse_by_value_freq_average(params):
     """
     De-disperse using specified value of DM and average in frequency.
 
@@ -29,6 +30,7 @@ def _de_disperse_by_value_freq_average(array, dm, nu, nu_max, d_t):
         faster for data with big sizes. But it returns already frequency
         averaged de-dispersed dyn. spectra.
     """
+    array, dm, nu, nu_max, d_t = params
     n_nu, n_t = array.shape
 
     # Calculate shift of time caused by de-dispersion for all channels
@@ -98,8 +100,9 @@ class DeDisperser(object):
         self.dm_values = dm_values
         self.args = args
         self.kwargs = kwargs
+        self.info = None
 
-    def __call__(self, dsp, cache_dir):
+    def __call__(self, dsp, cache_dir=None):
         """
         :param dsp:
             Instance of ``DSP`` class.
@@ -108,14 +111,17 @@ class DeDisperser(object):
         :return:
             Instance of ``DDDSP`` calss
         """
+        if cache_dir is None:
+            cache_dir = os.getcwd()
         de_disp_cache_fname = os.path.join(cache_dir,
                                            dsp._cache_fname_prefix +
                                            "_dedisp.hdf5")
 
-        dddsp = DDDSP(dsp, dm_values)
-        dddsp.array = self.func(dsp.array, self.dm_grid, *self.args, **self.kwargs)
+        dddsp = DDDSP(dsp, self.dm_values)
+        dddsp.array = self.func(dsp.values, self.dm_values, *self.args,
+                                **self.kwargs)
         return dddsp
 
-    def clear_cache(dsp, cache_dir):
+    def clear_cache(self, dsp, cache_dir):
         pass
 

@@ -12,14 +12,17 @@ import matplotlib
 matplotlib.use('Agg')
 
 
-# FIXME: Should work with any class instances - `dsp` or `dddsp`
 class Searcher(object):
+    """
+    Class wrapper around search functions that returns instances of
+    ``Candidate`` class.
+    """
     def __init__(self, func, *args, **kwargs):
         self.func = func
         self.args = args
         self.kwargs = kwargs
 
-    def __call__(self, dddsp, plot_candidates=True):
+    def __call__(self, dddsp, plot_candidates=False):
         found_dmt = self.func(dddsp.array, *self.args, **self.kwargs)
         candidates = list()
         for ix_dm, ix_t in found_dmt:
@@ -34,6 +37,15 @@ class Searcher(object):
 
 
 def search_shear(image, mph=3.5, mpd=50, shear=0.4):
+    """
+    Rotate image and bring dedispersed signal to vertical lines. Average them
+    and found locations of peaks.
+    :param image:
+    :param mph:
+    :param mpd:
+    :param shear:
+    :return:
+    """
     tform = AffineTransform(shear=shear)
     warped_image = warp(image, tform)
     warped = np.sum(warped_image, axis=0)
@@ -47,7 +59,6 @@ def search_shear(image, mph=3.5, mpd=50, shear=0.4):
     return zip(ixs_dm, ixs_t)
 
 
-# TODO: All search functions must returns instances of ``Candidate`` class
 def search_clf(image, pclf, save_fig=True):
     """
     Search FRB in de-dispersed and pre-processed dynamical spectra using

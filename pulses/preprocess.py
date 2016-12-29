@@ -14,7 +14,9 @@ class PreProcesser(object):
         self.args = args
         self.kwargs = kwargs
 
-    def __call__(self, dddsp, cache_dir):
+    def __call__(self, dddsp, cache_dir=None):
+        if cache_dir is None:
+            cache_dir = os.getcwd()
         cache_fname = os.path.join(cache_dir,
                                     dddsp.dsp._cache_fname_prefix +
                                     "_preprocess.hdf5")

@@ -3,7 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import (aliased, sessionmaker)
 from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base
-from candidate import Candidate
+import candidate
 from searched_data import SearchedData
 
 
@@ -20,8 +20,8 @@ def connect_to_db(db_file):
 
 def query_frb(session, exp_code, d_dm, d_t):
 
-    sq = session.query(Candidate, SearchedData).select_from(Candidate). \
-        join(SearchedData, SearchedData.id == Candidate.searched_data_id). \
+    sq = session.query(candidate.Candidate, SearchedData).select_from(candidate.Candidate). \
+        join(SearchedData, SearchedData.id == candidate.Candidate.searched_data_id). \
         filter(SearchedData.exp_code == exp_code).subquery()
     sq2 = aliased(sq)
     result = session.query(sq.c.t, sq2.c.t, sq.c.dm, sq2.c.dm, sq.c.antenna,

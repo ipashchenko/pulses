@@ -104,8 +104,8 @@ class DSP(object):
 
     @property
     def _cache_fname_prefix(self):
-        date_0, time_0 = str(self.dsp.t_0.utc.datetime).split(' ')
-        date_1, time_1 = str(self.dsp.t_end.utc.datetime).split(' ')
+        date_0, time_0 = str(self.t_0.utc.datetime).split(' ')
+        date_1, time_1 = str(self.t_end.utc.datetime).split(' ')
         return "{}_{}_{}_{}_{}_{}_{}".format(self.meta_data['exp_code'],
                                              self.meta_data['antenna'],
                                              self.meta_data['freq'], date_0,
@@ -242,7 +242,7 @@ class DSP(object):
 
 
 class DDDSP(object):
-    def __init__(self, dm_values, dsp=None):
+    def __init__(self, dsp, dm_values):
         """
         :param d_t:
             Time step [s].

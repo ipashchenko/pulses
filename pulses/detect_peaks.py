@@ -50,7 +50,7 @@ def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',
     .. [1] http://nbviewer.ipython.org/github/demotu/BMC/blob/master/notebooks/DetectPeaks.ipynb
     Examples
     --------
-    >>> from detect_peaks import detect_peaks
+    >>> from pulses.detect_peaks import detect_peaks
     >>> x = np.random.randn(100)
     >>> x[60:81] = np.nan
     >>> # detect all peaks and plot data
@@ -160,4 +160,4 @@ def _plot(x, mph, mpd, threshold, edge, valley, ax, ind):
         ax.set_title("%s (mph=%s, mpd=%d, threshold=%s, edge='%s')"
                      % (mode, str(mph), mpd, str(threshold), edge))
         # plt.grid()
-plt.show()
+        plt.show()

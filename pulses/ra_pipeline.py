@@ -65,28 +65,11 @@ if __name__ == '__main__':
                                                       'statistic': 'mean'})
     preprocessers = [None, preprocesser, preprocesser]
 
-    # Training instance of ``PulseClassifier``
-    from classifier import PulseClassifier
-    from sklearn.ensemble import GradientBoostingClassifier
-    param_grid = {'learning_rate': [0.3, 0.1, 0.05, 0.01],
-                  'max_depth': [2, 3, 4, 5],
-                  'min_samples_leaf': [2, 3, 6, 10],
-                  'max_features': [1.0, 0.5, 0.2, 0.1]}
-    clf_kwargs = {'n_estimators': 3000}
-    pclf = PulseClassifier(GradientBoostingClassifier, preprocesser, param_grid,
-                           clf_kwargs)
-    dsp_train = DSPIterator(m5_file, m5_fmt, freq_band_pol, chunk_size, n_nu,
-                            d_t, nu_0, d_nu, meta_data).get_dsp()
-    features_dict, responses_dict = pclf.create_samples(dsp_train, pls_params)
-    pclf.train(features_dict, responses_dict)
-
-
     searchers = [Searcher(search_shear, {'mph': 3.5, 'mpd': 50,
                                          'shear': 0.4}),
                  Searcher(search_ell, {'x_stddev': 10., 'y_to_x_stddev': 0.3,
                                        'theta_lims': [130., 180.],
-                                       'x_cos_theta': 3., 'save_fig': True}),
-                 Searcher(search_clf, {'save_fig': True})]
+                                       'x_cos_theta': 3., 'save_fig': True})]
     ra_pipeline = RAPipeline(exp_code, cfx_file, raw_data_dir, db_file,
                              cache_dir)
     ra_pipeline.add_dedisperser(dedisperser)

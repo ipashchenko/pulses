@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from sqlalchemy import (Column, Integer, Float, String, DateTime)
-from db import Base
+from base import Base
 
 
 class SearchedData(Base):

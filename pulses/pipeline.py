@@ -26,6 +26,16 @@ class Pipeline(object):
         self.cache_dir = cache_dir
         assert len(pre_processers) == len(searchers)
 
+    def save_to_db(self, candidates, info):
+
+        searched_data = SearchedData(algo=info, **self.meta_data)
+        searched_data.candidates = candidates
+        # Saving searched meta-data and found candidates to DB
+        if self.db_file is not None:
+            session = connect_to_db(self.db_file)
+            session.add(searched_data)
+            session.commit()
+
     def run(self):
         for dsp in self.dsp_iterator:
             for pre_processer, searcher in zip(self.pre_processers,
@@ -38,18 +48,8 @@ class Pipeline(object):
                     pass
 
                 candidates = searcher(dddsp)
+                algo = 'dd_{}_proc_{}_search_{}'.format(self.de_disperser.info,
+                                                        pre_processer.info,
+                                                        searcher.info)
+                self.save_to_db(candidates, algo)
 
-                algo = 'de_disp_{}_{}_{} pre_process_{}_{}_{}' \
-                       ' search_{}_{}'.format(de_disp_func.__name__, de_disp_args,
-                                              de_disp_kwargs,
-                                              preprocess_func_name,
-                                              preprocess_args, preprocess_kwargs,
-                                              search_func.__name__, search_kwargs)
-
-                searched_data = SearchedData(algo=algo, **self.meta_data)
-                searched_data.candidates = candidates
-                # Saving searched meta-data and found candidates to DB
-                if self.db_file is not None:
-                    session = connect_to_db(self.db_file)
-                    session.add(searched_data)
-                    session.commit()

@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from sqlalchemy import (Column, Integer, Float, ForeignKey, DateTime)
-from db import Base
+from base import Base
 from searched_data import SearchedData
+from sqlalchemy.orm import (backref, relation)
 
 
 class Candidate(Base):
